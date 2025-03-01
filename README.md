@@ -31,7 +31,9 @@ Type "help", "copyright", "credits" or "license" for more information.
 >>> import json
 >>> import asyncio
 >>> from ector import extract
->>> print(json.dumps(asyncio.run(extract("Hello, do you have some apple juice at 4 eur ? i only have 15 eur")), indent=2))
+>>>
+>>> text = "Hello, do you have some apple juice at 4 eur ? i only have 15 eur"
+>>> print(json.dumps(asyncio.run(extract(text)), indent=2))
 {
   "products": [
     {

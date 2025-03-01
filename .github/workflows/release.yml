@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install Poetry
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+
+    - name: Install dependencies
+      run: poetry install
+
+    - name: Clean up previous builds
+      run: |
+        rm -rf build/*
+        rm -rf dist/*
+        rm -rf *.egg-info
+
+    - name: Build and publish with poetry
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        poetry build
+        poetry publish --username $TWINE_USERNAME --password $TWINE_PASSWORD
