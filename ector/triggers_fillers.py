@@ -9,7 +9,7 @@ from ector.dictionary import (
     REQUEST_TRIGGERS_FR,
 )
 
-_PRICE_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s?([^,\s\d]+)?", re.IGNORECASE)
+PRICE_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s?([^,\s\d]+)?", re.IGNORECASE)
 
 
 def load_spacy_model(lang: str) -> spacy.language.Language:
@@ -38,7 +38,7 @@ def parse_money_entity(money_text: str):
     Returns (price, currency) or (None, None) if nothing is extracted.
     """
 
-    if not (match := _PRICE_PATTERN.search(money_text)):
+    if not (match := PRICE_PATTERN.search(money_text)):
         return None, None
 
     price = match.group(1)

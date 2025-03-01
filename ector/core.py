@@ -7,35 +7,22 @@ from ector.dictionary import (
     MONEY_PATTERN,
 )
 from ector.triggers_fillers import (
+    PRICE_PATTERN,
     get_triggers_and_fillers,
     load_spacy_model,
     parse_money_entity,
 )
 
 
-def contains_request_triggers(sentence: str, triggers: list[str]) -> bool:
+async def contains_request_triggers(sentence: str, triggers: list[str]) -> bool:
     """
     Check if the sentence contains any of the given request trigger phrases or words.
-
-    :param sentence: The text of the sentence to check.
-    :param triggers: A list of strings that indicate a product request.
-    :return: True if at least one trigger is found, False otherwise.
-
-    Examples:
-        >>> sent = "I am looking for a new phone."
-        >>> triggers = ["looking for", "need", "want"]
-        >>> contains_request_triggers(sent, triggers)
-        True
-
-        >>> sent2 = "This is just a regular sentence."
-        >>> contains_request_triggers(sent2, triggers)
-        False
     """
     low_text = sentence.lower()
     return any(trigger in low_text for trigger in triggers)
 
 
-def find_main_product_tokens(sentence) -> list:
+async def find_main_product_tokens(sentence) -> list:
     """
     Identify the main product-related tokens (NOUN or PROPN) within the given sentence.
     It looks for direct objects, prepositional objects, or subject complements in an existential construction.
@@ -198,7 +185,7 @@ def extract_price_info_from_sentence(sentence) -> tuple[Any, Any]:
     return None, None
 
 
-def maybe_budget(sentence_text: str, lang: str = "en") -> bool:
+async def maybe_budget(sentence_text: str, lang: str = "en") -> bool:
     """
     Heuristic check to see if a user might be indicating a budget,
     using extensive lists of hints for English and French.
@@ -219,7 +206,7 @@ def maybe_budget(sentence_text: str, lang: str = "en") -> bool:
     return any(hint in text_lower for hint in EN_BUDGET_HINTS)
 
 
-def extract_price_info(sentence_text: str):
+async def extract_price_info(sentence_text: str):
     """
     Parse the first occurrence of a numeric + currency pattern from the raw sentence text.
     Returns (price, currency) or (None, None) if no match.
@@ -252,6 +239,21 @@ def extract_price_info(sentence_text: str):
     return None, None
 
 
+async def add_product(product_name, price, currency, products):
+    """Just adding product to the list of products to be returned"""
+
+    if MONEY_PATTERN.search(product_name):
+        return
+
+    entry = {"product": product_name}
+    if price is not None and price > 0:
+        entry["price"] = price
+
+    if currency is not None:
+        entry["currency"] = currency
+    products.append(entry)
+
+
 async def extract(text: str, lang: str = "en") -> dict:
     """
     Asynchronously extract product requests and an inferred budget from the input text.
@@ -279,19 +281,7 @@ async def extract(text: str, lang: str = "en") -> dict:
     request_triggers, filler_phrases = get_triggers_and_fillers(lang)
     doc = nlp(text)
 
-    def add_product(product_name, price, currency):
-        # a price is not a product
-        if MONEY_PATTERN.search(product_name):
-            return
-
-        entry = {"product": product_name}
-        if price is not None and price > 0:
-            entry["price"] = price
-            if currency is not None:
-                entry["currency"] = currency
-        product_requests.append(entry)
-
-    product_requests = []
+    products = []
     budget_info = {"price": 0.0, "currency": None}
 
     for sent in doc.sents:
@@ -299,19 +289,19 @@ async def extract(text: str, lang: str = "en") -> dict:
         if not sentence_text:
             continue
 
-        found_price, found_currency = extract_price_info(sentence_text)
-        has_triggers = contains_request_triggers(sentence_text, request_triggers)
-        main_product_tokens = find_main_product_tokens(sent)
+        found_price, found_currency = await extract_price_info(sentence_text)
+        has_triggers = await contains_request_triggers(sentence_text, request_triggers)
+        main_product_tokens = await find_main_product_tokens(sent)
 
         # 1) If no triggers or products, but text suggests a budget, treat as budget
         if not has_triggers and not main_product_tokens and found_price is not None:
-            if not maybe_budget(sentence_text):
+            if not await maybe_budget(sentence_text):
                 continue
             budget_info["price"] = found_price
             budget_info["currency"] = found_currency
 
         # 2) If the sentence explicitly indicates budget, store it and skip product extraction
-        if maybe_budget(sentence_text) and found_price is not None:
+        if await maybe_budget(sentence_text) and found_price is not None:
             budget_info["price"] = found_price
             budget_info["currency"] = found_currency
             continue
@@ -322,14 +312,14 @@ async def extract(text: str, lang: str = "en") -> dict:
             if not main_product_tokens:
                 if found_price is None:
                     continue
-                add_product(None, found_price, found_currency)
+                await add_product(None, found_price, found_currency, products)
 
             # We have product tokens
             for token in main_product_tokens:
                 raw_phrase = collect_product_phrase(token, main_product_tokens)
                 cleaned_product = clean_phrase(raw_phrase, filler_phrases)
                 if cleaned_product and "budget" not in cleaned_product.lower():
-                    add_product(cleaned_product, found_price, found_currency)
+                    await add_product(cleaned_product, found_price, found_currency, products)
 
         # 4) No triggers but product tokens exist -> treat as normal requests
         elif main_product_tokens:
@@ -337,10 +327,10 @@ async def extract(text: str, lang: str = "en") -> dict:
                 raw_phrase = collect_product_phrase(token, main_product_tokens)
                 cleaned_product = clean_phrase(raw_phrase, filler_phrases)
                 if cleaned_product and "budget" not in cleaned_product.lower():
-                    add_product(cleaned_product, found_price, found_currency)
+                    await add_product(cleaned_product, found_price, found_currency, products)
 
     # Build final output
     if budget_info["price"] and budget_info["price"] > 0 and budget_info["currency"]:
-        return {"products": product_requests, "budget": budget_info}
+        return {"products": products, "budget": budget_info}
 
-    return {"products": product_requests}
+    return {"products": products}

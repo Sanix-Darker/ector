@@ -8,8 +8,8 @@ This is not an "OpenAI wrapper", it use NLP(Natural Language Processing)
 and tokens manipulations to 'understand the given input' then extract product
 key name + budget.
 
-Therefore, this is not optimized at all and was not tested on edge-cases.
-
+Therefore, this is not 100% optimized at all and was not tested on extreme edge-cases.
+However it's quite fast and does the job for my use case at the moment.
 
 ### REQUIREMENTS
 

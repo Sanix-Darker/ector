@@ -321,6 +321,7 @@ FILLER_PHRASES_FR = [f.lower() for f in FILLER_PHRASES_FR]
 # for budget
 
 EN_BUDGET_HINTS = [
+    "around",
     "only have",
     "can only spend",
     "limit is",
@@ -360,6 +361,7 @@ EN_BUDGET_HINTS = [
 ]
 
 FR_BUDGET_HINTS = [
+    "autour de",
     "je n'ai que",
     "ma limite",
     "mon budget",
