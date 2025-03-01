@@ -254,14 +254,16 @@ async def add_product(product_name, price, currency, products):
         entry["currency"] = currency
     products.append(entry)
 
+
 def replace_punctuation_with_fullstop(text: str) -> str:
     result_chars = []
     for ch in text:
         if ch in string.punctuation:
-            result_chars.append('.')
+            result_chars.append(".")
             continue
         result_chars.append(ch)
-    return ''.join(result_chars)
+    return "".join(result_chars)
+
 
 async def extract(text: str, lang: str = "en") -> dict:
     """
@@ -329,7 +331,9 @@ async def extract(text: str, lang: str = "en") -> dict:
                 raw_phrase = collect_product_phrase(token, main_product_tokens)
                 cleaned_product = clean_phrase(raw_phrase, filler_phrases)
                 if cleaned_product and "budget" not in cleaned_product.lower():
-                    await add_product(cleaned_product, found_price, found_currency, products)
+                    await add_product(
+                        cleaned_product, found_price, found_currency, products
+                    )
 
         # 4) No triggers but product tokens exist -> treat as normal requests
         elif main_product_tokens:
@@ -337,7 +341,9 @@ async def extract(text: str, lang: str = "en") -> dict:
                 raw_phrase = collect_product_phrase(token, main_product_tokens)
                 cleaned_product = clean_phrase(raw_phrase, filler_phrases)
                 if cleaned_product and "budget" not in cleaned_product.lower():
-                    await add_product(cleaned_product, found_price, found_currency, products)
+                    await add_product(
+                        cleaned_product, found_price, found_currency, products
+                    )
 
     # Build final output
     if budget_info["price"] and budget_info["price"] > 0 and budget_info["currency"]:

@@ -400,7 +400,7 @@ FR_BUDGET_HINTS = [
 CURRENCY_ONLY_PATTERN = re.compile(
     r"(usd|eur|gbp|cad|aud|inr|jpy|chf|krw|sar|dirham|dhs|"
     r"dollars?|euros?|pounds?|yen|rupees?|\$|€|£)",
-    re.IGNORECASE
+    re.IGNORECASE,
 )
 MONEY_PATTERN = re.compile(
     r"(\d+(?:\.\d+)?)(?:\s*(usd|eur|gbp|cad|aud|inr|jpy|chf|krw|sar|dirham|dhs|"
