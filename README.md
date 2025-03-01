@@ -14,7 +14,7 @@ However it's quite fast and does the job for my use case at the moment.
 ### REQUIREMENTS
 
 - python3 (>=3.10)
-- [scapy](https://pypi.org/project/spacy)
+- [scapy](https://pypi.org/project/spacy/)
 
 ### HOW TO INSTALL
 
