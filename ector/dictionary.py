@@ -321,7 +321,6 @@ FILLER_PHRASES_FR = [f.lower() for f in FILLER_PHRASES_FR]
 # for budget
 
 EN_BUDGET_HINTS = [
-    "around",
     "only have",
     "can only spend",
     "limit is",
@@ -361,7 +360,6 @@ EN_BUDGET_HINTS = [
 ]
 
 FR_BUDGET_HINTS = [
-    "autour de",
     "je n'ai que",
     "ma limite",
     "mon budget",
@@ -399,6 +397,11 @@ FR_BUDGET_HINTS = [
 ]
 
 # for currency
+CURRENCY_ONLY_PATTERN = re.compile(
+    r"(usd|eur|gbp|cad|aud|inr|jpy|chf|krw|sar|dirham|dhs|"
+    r"dollars?|euros?|pounds?|yen|rupees?|\$|€|£)",
+    re.IGNORECASE
+)
 MONEY_PATTERN = re.compile(
     r"(\d+(?:\.\d+)?)(?:\s*(usd|eur|gbp|cad|aud|inr|jpy|chf|krw|sar|dirham|dhs|"
     r"dollars?|euros?|pounds?|yen|rupees?|\$|€|£))?",

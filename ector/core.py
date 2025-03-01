@@ -1,13 +1,14 @@
 from typing import Any
+import string
 from ector.dictionary import (
     CURRENCY_MAP,
+    CURRENCY_ONLY_PATTERN,
     EN_BUDGET_HINTS,
     FR_BUDGET_HINTS,
     FRENCH,
     MONEY_PATTERN,
 )
 from ector.triggers_fillers import (
-    PRICE_PATTERN,
     get_triggers_and_fillers,
     load_spacy_model,
     parse_money_entity,
@@ -242,7 +243,7 @@ async def extract_price_info(sentence_text: str):
 async def add_product(product_name, price, currency, products):
     """Just adding product to the list of products to be returned"""
 
-    if MONEY_PATTERN.search(product_name):
+    if CURRENCY_ONLY_PATTERN.search(product_name):
         return
 
     entry = {"product": product_name}
@@ -253,6 +254,14 @@ async def add_product(product_name, price, currency, products):
         entry["currency"] = currency
     products.append(entry)
 
+def replace_punctuation_with_fullstop(text: str) -> str:
+    result_chars = []
+    for ch in text:
+        if ch in string.punctuation:
+            result_chars.append('.')
+            continue
+        result_chars.append(ch)
+    return ''.join(result_chars)
 
 async def extract(text: str, lang: str = "en") -> dict:
     """
@@ -277,6 +286,7 @@ async def extract(text: str, lang: str = "en") -> dict:
         }
         (budget only appears if inferred)
     """
+    text = replace_punctuation_with_fullstop(text)
     nlp = load_spacy_model(lang)
     request_triggers, filler_phrases = get_triggers_and_fillers(lang)
     doc = nlp(text)

@@ -32,14 +32,17 @@ Type "help", "copyright", "credits" or "license" for more information.
 >>> import asyncio
 >>> from ector import extract
 >>>
->>> text = "Hello, do you have some apple juice at 4 eur ? i only have 15 eur"
+>>> text = "Hello, do you have some apple juice at 9 eur ? i also want bananas, but i only have 15 eur"
 >>> print(json.dumps(asyncio.run(extract(text)), indent=2))
 {
   "products": [
     {
       "product": "Apple juice",
-      "price": 4.0,
+      "price": 9.0,
       "currency": "eur"
+    },
+    {
+      "product": "Bananas"
     }
   ],
   "budget": {
