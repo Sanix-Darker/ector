@@ -1,5 +1,7 @@
 import re
+import subprocess
 import spacy
+from spacy.util import is_package
 
 from ector.dictionary import (
     FILLER_PHRASES_EN,
@@ -12,13 +14,20 @@ from ector.dictionary import (
 PRICE_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s?([^,\s\d]+)?", re.IGNORECASE)
 
 
+def ensure_model_installed(model_name):
+    """Ensure that a specific spaCy model is installed."""
+    if not is_package(model_name):
+        subprocess.run(["python", "-m", "spacy", "download", model_name], check=True)
+
 def load_spacy_model(lang: str) -> spacy.language.Language:
     """
     Load and return the spaCy language model based on the provided language code.
     """
 
     if lang == FRENCH:
+        ensure_model_installed("fr_core_news_sm")
         return spacy.load("fr_core_news_sm")
+    ensure_model_installed("en_core_web_sm")
     return spacy.load("en_core_web_sm")
 
 

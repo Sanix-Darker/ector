@@ -292,21 +292,6 @@ files = [
 ]
 
 [[package]]
-name = "en_core_web_sm"
-version = "3.8.0"
-description = "English pipeline optimized for CPU. Components: tok2vec, tagger, parser, senter, ner, attribute_ruler, lemmatizer."
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "en_core_web_sm-3.8.0-py3-none-any.whl", hash = "sha256:1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85"},
-]
-
-[package.source]
-type = "url"
-url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
-
-[[package]]
 name = "exceptiongroup"
 version = "1.2.2"
 description = "Backport of PEP 654 (exception groups)"
@@ -321,21 +306,6 @@ files = [
 
 [package.extras]
 test = ["pytest (>=6)"]
-
-[[package]]
-name = "fr_core_news_sm"
-version = "3.8.0"
-description = "French pipeline optimized for CPU. Components: tok2vec, morphologizer, parser, senter, ner, attribute_ruler, lemmatizer."
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "fr_core_news_sm-3.8.0-py3-none-any.whl", hash = "sha256:7d6ad14cd5078e53147bfbf70fb9d433c6a3865b695fda2657140bbc59a27e29"},
-]
-
-[package.source]
-type = "url"
-url = "https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl"
 
 [[package]]
 name = "idna"
@@ -1567,4 +1537,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "cb8a23496f31ebcc08546632a09483760b34a685ea580200ae523e76a4adc12b"
+content-hash = "da3281df1a0a255eb3a2be0e7c2a0c6d5c651e5989dec2c5dc297e0d591b69fb"
