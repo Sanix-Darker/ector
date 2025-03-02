@@ -1,6 +1,6 @@
 [project]
 name = "ector"
-version = "0.1.1"
+version = "0.1.2"
 description = "Extract from a given long text input, eCommerce products and price budget."
 authors = [
     {name = "sanix-darker",email = "s4nixd@gmail.com"}
