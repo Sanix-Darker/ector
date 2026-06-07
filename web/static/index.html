@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ECTOR — e-commerce request parser</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18M7 3v18"/></svg>
+        </span>
+        <div>
+          <h1>ECTOR</h1>
+          <p class="tagline">Natural-language → structured e-commerce query. No LLM. Millisecond, deterministic.</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="install">
+          <code id="install-cmd">pip install ector</code>
+          <button id="copy-install" class="copy-btn" title="Copy">Copy</button>
+        </div>
+        <a id="repo-link" class="icon-btn" href="https://github.com/Sanix-Darker/ector" target="_blank" rel="noopener" title="View on GitHub" aria-label="View source on GitHub">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 4.7 18 5 18 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+        </a>
+        <button id="theme-toggle" class="icon-btn" title="Toggle theme" aria-label="Toggle light/dark theme"></button>
+      </div>
+    </header>
+
+    <section class="examples">
+      <div class="examples-head">
+        <span class="examples-label">Try an example</span>
+        <div class="examples-actions">
+          <button id="combine" class="ghost-btn" title="Combine two samples of the same language">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+            Combine samples
+          </button>
+          <button id="random" class="ghost-btn" title="Pick a random sample (any language)">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.4" fill="currentColor" stroke="none"/></svg>
+            Random pick
+          </button>
+        </div>
+      </div>
+      <div id="examples"></div>
+    </section>
+
+    <main class="panes">
+      <section class="pane">
+        <div class="pane-head">
+          <h2>Request</h2>
+          <div class="controls">
+            <select id="lang" title="Language">
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+            </select>
+            <button id="compute" class="primary">Compute →</button>
+          </div>
+        </div>
+        <textarea id="input" placeholder="e.g. I'm looking for a wireless gaming mouse and a keyboard, budget 150 usd"></textarea>
+        <div class="pane-foot">
+          <span id="counter" class="counter" aria-live="polite"><span class="num">0</span> words · <span class="num">0</span> tokens · <span class="num">0</span> chars</span>
+          <span class="hint" id="latency"></span>
+        </div>
+      </section>
+
+      <section class="pane output-pane">
+        <div class="pane-head">
+          <h2>Structured output</h2>
+          <div class="controls">
+            <button id="expand-all" class="copy-btn" title="Expand all">Expand all</button>
+            <button id="collapse-all" class="copy-btn" title="Collapse all">Collapse all</button>
+            <button id="copy-json" class="copy-btn" title="Copy JSON">Copy JSON</button>
+          </div>
+        </div>
+        <div id="output" class="json"><span class="muted">// Press “Compute” to parse the request</span></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Powered by <strong>ECTOR</strong> + spaCy. Deterministic, offline, typo-tolerant.</span>
+      <span id="version" class="muted"></span>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
