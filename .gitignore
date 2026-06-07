@@ -22,3 +22,6 @@ venv/
 # Deploy: keep *.example, ignore the generated local copies
 deploy/Caddyfile
 deploy/ector.env
+.claude/
+.codex/
+TO-ASK*
