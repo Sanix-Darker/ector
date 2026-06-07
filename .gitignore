@@ -12,3 +12,13 @@ dist/
 
 *.pyc
 venv/
+.venv/
+
+# Test & tooling caches
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Deploy: keep *.example, ignore the generated local copies
+deploy/Caddyfile
+deploy/ector.env
