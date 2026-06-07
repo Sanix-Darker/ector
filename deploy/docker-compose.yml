@@ -1,0 +1,33 @@
+# ECTOR web + Caddy reverse proxy (modeled on the caddy-fastapi pattern).
+# Usage:
+#   cd deploy && docker compose up --build
+# Then point your domain at the host; edit Caddyfile.example -> Caddyfile first.
+services:
+  ector-web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      WORKERS: "1"
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    depends_on:
+      - ector-web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,29 @@
+[Unit]
+Description=ECTOR web showcase (FastAPI e-commerce request parser)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ector
+Group=ector
+WorkingDirectory=/opt/ector
+# HOST/PORT/WORKERS and ECTOR_AUTO_DOWNLOAD live here (see ector.env.example).
+EnvironmentFile=-/etc/ector/ector.env
+Environment=HOST=127.0.0.1
+Environment=PORT=8000
+Environment=WORKERS=1
+# Runs uvicorn from the project virtualenv created under /opt/ector/.venv.
+ExecStart=/opt/ector/.venv/bin/uvicorn web.app:app --host ${HOST} --port ${PORT} --workers ${WORKERS}
+Restart=always
+RestartSec=3
+
+# Hardening (mirrors shhx.dev's unit).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ector
+
+[Install]
+WantedBy=multi-user.target

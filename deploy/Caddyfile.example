@@ -1,0 +1,42 @@
+# ECTOR web showcase - Caddy reverse proxy (modeled on shhx.dev).
+# Replace example.com with your domain. The app (uvicorn) listens on 127.0.0.1:8000.
+
+http://example.com {
+	redir https://example.com{uri} permanent
+}
+
+http://www.example.com {
+	redir https://example.com{uri} permanent
+}
+
+https://example.com {
+	# Replace with your real certificate strategy.
+	# `tls internal` suits a private origin behind another TLS edge; for a public
+	# domain, remove this line and let Caddy obtain a Let's Encrypt cert
+	# automatically (set your email with the global `email` option).
+	tls internal
+
+	reverse_proxy 127.0.0.1:8000
+	encode gzip
+
+	header {
+		-Server
+		# basic hardening headers
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Content-Type-Options "nosniff"
+	}
+
+	@css path *.css
+	header @css Content-Type text/css
+
+	@js path *.js
+	header @js Content-Type application/javascript
+
+	@svg path *.svg
+	header @svg Content-Type image/svg+xml
+}
+
+https://www.example.com {
+	tls internal
+	redir https://example.com{uri} permanent
+}
