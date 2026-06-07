@@ -11,6 +11,24 @@ dependencies = [
     "spacy (>=3.8.4,<4.0.0)",
 ]
 
+[project.optional-dependencies]
+# spaCy language models are required at runtime but are not regular PyPI
+# dependencies; install them explicitly or via these extras.
+#   pip install "ector[models]"
+models = [
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "fr_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl",
+]
+# Optional web showcase (FastAPI demo). Core library has no web dependencies.
+#   pip install "ector[web]"
+web = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
+
+[project.scripts]
+ector = "ector.cli:main"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
@@ -19,3 +37,26 @@ build-backend = "poetry.core.masonry.api"
 pytest = "^8.4.2"
 ruff = "^0.14.3"
 
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = [".venv", "build", "dist"]
+
+[tool.ruff.lint]
+# E/F: pyflakes+pycodestyle, I: isort, UP: pyupgrade, B: bugbear, C4: comprehensions
+select = ["E", "F", "I", "UP", "B", "C4", "W"]
+ignore = [
+    "E501",  # line length handled by formatter; long data lines in dictionaries
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ector", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# Dictionary data modules contain large literal collections.
+"ector/dictionary/*.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
