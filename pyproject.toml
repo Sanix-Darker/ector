@@ -23,7 +23,7 @@ models = [
 #   pip install "ector[web]"
 web = [
     "fastapi>=0.110",
-    "uvicorn>=0.29",
+    "uvicorn>=0.49.0",
 ]
 
 [project.scripts]
