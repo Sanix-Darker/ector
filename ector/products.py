@@ -11,6 +11,7 @@ See ``docs/features/01-product-extraction.md``.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 from spacy.tokens import Span, Token
 
@@ -412,11 +413,12 @@ _GENERIC_NON_PRODUCT = frozenset({
 })
 
 
-def _build_token_stopwords(config: LanguageConfig) -> frozenset[str]:
+@lru_cache(maxsize=4)
+def _build_token_stopwords(config_code: str, triggers: frozenset[str]) -> frozenset[str]:
     """Single-word surface forms to drop in the fallback extractor."""
     stop: set[str] = set(_GENERIC_NON_PRODUCT)
     # single-word triggers (e.g. "want", "need", "buy", "veux", "acheter")
-    for trig in config.triggers:
+    for trig in triggers:
         if " " not in trig:
             stop.add(trig)
     # connectors / splitters
@@ -435,7 +437,7 @@ def extract_products_fallback(sentence: Span, config: LanguageConfig) -> list[di
     Returns a list of ``{"name": str, "quantity": int | None}`` dicts. Price and
     currency are resolved at sentence level by the caller.
     """
-    stopwords = _build_token_stopwords(config)
+    stopwords = _build_token_stopwords(config.code, config.triggers)
 
     groups: list[list[Token]] = []
     current: list[Token] = []

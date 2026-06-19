@@ -9,6 +9,9 @@ See ``docs/features/01-product-extraction.md``.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from functools import lru_cache
+
 # Punctuation that should act as a sentence/clause separator. We convert these
 # to a period so the per-sentence pipeline treats each clause independently.
 # We deliberately do NOT touch:
@@ -63,7 +66,13 @@ def normalize_text(text: str) -> str:
     return "".join(out)
 
 
-def clean_phrase(phrase: str, fillers: tuple[str, ...] | list[str]) -> str:
+@lru_cache(maxsize=32)
+def _normalize_fillers(fillers: tuple[str, ...]) -> tuple[str, ...]:
+    """Canonical, deterministic filler ordering with fast reuse across calls."""
+    return tuple(sorted(set(fillers), key=len, reverse=True))
+
+
+def clean_phrase(phrase: str, fillers: Sequence[str]) -> str:
     """Strip a leading filler phrase and article, trim, and capitalize.
 
     Deterministic (BUG-012 fix): tries fillers longest-first and removes at most
@@ -83,7 +92,8 @@ def clean_phrase(phrase: str, fillers: tuple[str, ...] | list[str]) -> str:
     lowered = result.lower()
 
     # Remove at most one leading filler (longest match first).
-    for filler in sorted(set(fillers), key=len, reverse=True):
+    normalized_fillers = fillers if isinstance(fillers, tuple) else tuple(fillers)
+    for filler in _normalize_fillers(normalized_fillers):
         prefix = filler + " "
         if lowered.startswith(prefix):
             result = result[len(prefix):].strip()
