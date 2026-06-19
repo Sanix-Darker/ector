@@ -15,7 +15,13 @@
 
   // ---------------------------------------------------------------- helpers
   function escapeHtml(s) {
-    return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
+    }[c]));
   }
 
   const CARET_SVG =
@@ -256,6 +262,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, lang: langSel.value }),
         });
+        if (!res.ok) throw new Error("tokenize failed (" + res.status + ")");
         const data = await res.json();
         if (reqId !== tokenReq) return;
         setCounter(data.words, data.tokens, data.chars);
@@ -281,6 +288,11 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, lang: langSel.value }),
       });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        const message = payload && payload.detail ? payload.detail : "extract failed (" + res.status + ")";
+        throw new Error(message);
+      }
       const data = await res.json();
       const dt = (performance.now() - t0).toFixed(1);
       lastResult = data;

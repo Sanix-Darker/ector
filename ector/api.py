@@ -19,6 +19,11 @@ Result schema (normative, see docs/features/06-public-api.md)::
 
 from __future__ import annotations
 
+import copy
+import os
+import re
+from functools import lru_cache
+
 from ector.attributes import detect_attributes, detect_brand, detect_condition
 from ector.budget import build_budget, is_budget
 from ector.constraints import parse_constraint
@@ -38,6 +43,136 @@ from ector.products import (
 from ector.text_utils import clean_phrase, normalize_text
 from ector.triggers import contains_trigger
 from ector.types import ExtractResult, Product
+
+_WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
+_DEFAULT_EXTRACT_CACHE_SIZE = 2048
+_DEFAULT_EXTRACT_CACHE_TEXT_LIMIT = 1400
+
+
+def _env_int(name: str, default: int) -> int:
+    """Read a positive integer env var, with a safe fallback."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(0, value)
+
+
+_EXTRACT_CACHE_SIZE = _env_int("ECTOR_EXTRACT_CACHE_SIZE", _DEFAULT_EXTRACT_CACHE_SIZE)
+_EXTRACT_CACHE_TEXT_LIMIT = _env_int(
+    "ECTOR_EXTRACT_CACHE_TEXT_LIMIT",
+    _DEFAULT_EXTRACT_CACHE_TEXT_LIMIT,
+)
+
+
+def _normalize_lang(raw_lang: str | None) -> str:
+    """Normalize language input once and keep fallback behavior deterministic."""
+    if not raw_lang:
+        return "en"
+    return str(raw_lang).strip().lower()
+
+
+@lru_cache(maxsize=_EXTRACT_CACHE_SIZE)
+def _extract_cached(normalized_text: str, lang_code: str) -> ExtractResult:
+    """Cached extraction path for short repeated inputs."""
+    return _extract_from_normalized(normalized_text, lang_code)
+
+
+def _extract_from_normalized(normalized_text: str, lang_code: str) -> ExtractResult:
+    """Run the full extraction pipeline on already-normalized text."""
+    config = get_language(lang_code)
+    nlp = get_model(config.model_name)
+    records = []
+
+    for sent in nlp(normalized_text).sents:
+        text = sent.text.strip()
+        if text:
+            records.append(_classify_sentence(sent, config))
+
+    # Price-tail reconciliation: a clause that has a price but no product and is
+    # Reconciliation across comma/sentence splits. A "price tail" is a clause
+    # that carries a price but no product, trigger, or budget keyword (e.g.
+    # "..., 304 cad max", or just "20 £" split off from "je n'ai que").
+    for i, rec in enumerate(records):
+        is_price_tail = (
+            rec["price"] is not None
+            and not rec["product_tokens"]
+            and not rec["has_trigger"]
+            and not rec["is_budget"]
+        )
+        if not is_price_tail or i == 0:
+            continue
+        prev = records[i - 1]
+        # (a) previous clause is a budget keyword without a price -> form budget
+        if prev["is_budget"] and prev["price"] is None:
+            prev["price"] = rec["price"]
+            prev["currency"] = rec["currency"]
+            rec["consumed"] = True
+        # (b) previous clause has products/trigger but no price -> lend price
+        elif prev["price"] is None and (prev["product_tokens"] or prev["has_trigger"]):
+            prev["price"] = rec["price"]
+            prev["currency"] = rec["currency"]
+            rec["consumed"] = True
+
+    products: list[Product] = []
+    budget = None
+
+    for idx, rec in enumerate(records):
+        if rec.get("consumed"):
+            continue
+
+        # Budget sentence with a price -> record budget, skip products.
+        if rec["is_budget"]:
+            # Prefer a reconciled price (from a split-off tail clause); else
+            # parse the budget text directly, and if that fails, parse the budget
+            # text joined with the next clause (spaCy sometimes splits an amount
+            # and its currency, e.g. "budget de 9" + "usd").
+            if rec["price"] is not None:
+                new_budget = build_budget(rec["price"], rec["currency"])
+            else:
+                new_budget = _budget_from_text(rec["text"], config.code)
+                if new_budget is None and idx + 1 < len(records):
+                    joined = rec["text"] + " " + records[idx + 1]["text"]
+                    new_budget = _budget_from_text(joined, config.code)
+                    if new_budget is not None and not records[idx + 1]["product_tokens"]:
+                        records[idx + 1]["consumed"] = True
+            if new_budget is not None:
+                budget = new_budget
+                # A budget sentence may still mention a product ("budget 200 for
+                # a laptop"); only skip if it has no product signal.
+                if not rec["product_tokens"]:
+                    fb = _build_products_for_sentence(rec, config, None, None)
+                    if not fb:
+                        continue
+
+        # Build products for this sentence (dependency + token fallback). The
+        # fallback runs even without an explicit trigger so content-only clauses
+        # (e.g. a comma-split tail like "d'un batterie et google") are captured.
+        sentence_products = _build_products_for_sentence(
+            rec, config, rec["price"], rec["currency"]
+        )
+        if not rec["is_budget"]:
+            products.extend(sentence_products)
+        elif rec["product_tokens"]:
+            # budget sentence that also names a product
+            products.extend(sentence_products)
+
+    result: ExtractResult = {"products": products}
+    if budget is not None:
+        result["budget"] = budget
+
+    # Price constraint (max/min/around/between) parsed from the corrected text.
+    constraint = parse_constraint(normalized_text)
+    if constraint is not None:
+        result["price_constraint"] = constraint
+
+    # Coarse intent classification.
+    result["intent"] = classify_intent(normalized_text, has_products=bool(products))
+
+    return result
 
 
 def _make_product(
@@ -116,9 +251,7 @@ def _budget_from_text(text: str, lang: str):
 
 def _fuzzy_currency_in(text: str):
     """Find a currency in ``text`` allowing a misspelled currency word."""
-    import re as _re
-
-    for word in _re.findall(r"[^\W\d_]+", text):
+    for word in _WORD_RE.findall(text):
         if len(word) < 3:
             continue
         code = normalize_currency(word)
@@ -186,102 +319,15 @@ def extract_sync(text: str, lang: str = "en") -> ExtractResult:
     # Fast path: empty/whitespace input needs no model work.
     if not text or not text.strip():
         return {"products": [], "intent": "browse"}
-
-    config = get_language(lang)
-    nlp = get_model(config.model_name)
-
-    # Typo-correct closed-class / known vocabulary, then segment.
+    norm_lang = _normalize_lang(lang)
+    config = get_language(norm_lang)
     corrected = normalize_vocabulary(text, config.code)
     normalized = normalize_text(corrected)
-    doc = nlp(normalized)
 
-    records = [
-        _classify_sentence(sent, config)
-        for sent in doc.sents
-        if sent.text.strip()
-    ]
+    if _EXTRACT_CACHE_SIZE > 0 and len(normalized) <= _EXTRACT_CACHE_TEXT_LIMIT:
+        return copy.deepcopy(_extract_cached(normalized, config.code))
 
-    # Price-tail reconciliation: a clause that has a price but no product and is
-    # Reconciliation across comma/sentence splits. A "price tail" is a clause
-    # that carries a price but no product, trigger, or budget keyword (e.g.
-    # "..., 304 cad max", or just "20 £" split off from "je n'ai que").
-    for i, rec in enumerate(records):
-        is_price_tail = (
-            rec["price"] is not None
-            and not rec["product_tokens"]
-            and not rec["has_trigger"]
-            and not rec["is_budget"]
-        )
-        if not is_price_tail or i == 0:
-            continue
-        prev = records[i - 1]
-        # (a) previous clause is a budget keyword without a price -> form budget
-        if prev["is_budget"] and prev["price"] is None:
-            prev["price"] = rec["price"]
-            prev["currency"] = rec["currency"]
-            rec["consumed"] = True
-        # (b) previous clause has products/trigger but no price -> lend price
-        elif prev["price"] is None and (prev["product_tokens"] or prev["has_trigger"]):
-            prev["price"] = rec["price"]
-            prev["currency"] = rec["currency"]
-            rec["consumed"] = True
-
-    products: list[Product] = []
-    budget = None
-
-    for idx, rec in enumerate(records):
-        if rec.get("consumed"):
-            continue
-
-        # Budget sentence with a price -> record budget, skip products.
-        if rec["is_budget"]:
-            # Prefer a reconciled price (from a split-off tail clause); else
-            # parse the budget text directly, and if that fails, parse the budget
-            # text joined with the next clause (spaCy sometimes splits an amount
-            # and its currency, e.g. "budget de 9" + "usd").
-            if rec["price"] is not None:
-                new_budget = build_budget(rec["price"], rec["currency"])
-            else:
-                new_budget = _budget_from_text(rec["text"], config.code)
-                if new_budget is None and idx + 1 < len(records):
-                    joined = rec["text"] + " " + records[idx + 1]["text"]
-                    new_budget = _budget_from_text(joined, config.code)
-                    if new_budget is not None and not records[idx + 1]["product_tokens"]:
-                        records[idx + 1]["consumed"] = True
-            if new_budget is not None:
-                budget = new_budget
-                # A budget sentence may still mention a product ("budget 200 for
-                # a laptop"); only skip if it has no product signal.
-                if not rec["product_tokens"]:
-                    fb = _build_products_for_sentence(rec, config, None, None)
-                    if not fb:
-                        continue
-
-        # Build products for this sentence (dependency + token fallback). The
-        # fallback runs even without an explicit trigger so content-only clauses
-        # (e.g. a comma-split tail like "d'un batterie et google") are captured.
-        sentence_products = _build_products_for_sentence(
-            rec, config, rec["price"], rec["currency"]
-        )
-        if not rec["is_budget"]:
-            products.extend(sentence_products)
-        elif rec["product_tokens"]:
-            # budget sentence that also names a product
-            products.extend(sentence_products)
-
-    result: ExtractResult = {"products": products}
-    if budget is not None:
-        result["budget"] = budget
-
-    # Price constraint (max/min/around/between) parsed from the corrected text.
-    constraint = parse_constraint(normalized)
-    if constraint is not None:
-        result["price_constraint"] = constraint
-
-    # Coarse intent classification.
-    result["intent"] = classify_intent(normalized, has_products=bool(products))
-
-    return result
+    return _extract_from_normalized(normalized, config.code)
 
 
 async def extract(text: str, lang: str = "en") -> ExtractResult:

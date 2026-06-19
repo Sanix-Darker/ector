@@ -16,6 +16,7 @@ from __future__ import annotations
 #   - hyphens -> needed for French ("est-ce", "peut-être"),
 #   - decimal points -> needed for amounts like "9.99".
 _SEGMENTERS = ",;:"
+_SEGMENTER_SET = frozenset(_SEGMENTERS)
 
 # Articles to strip from the start of a product phrase (English + French).
 _ARTICLES = ("a ", "an ", "the ", "un ", "une ", "le ", "la ", "les ", "des ")
@@ -42,12 +43,16 @@ def normalize_text(text: str) -> str:
         >>> normalize_text("I want it for 2,000 usd")
         'I want it for 2,000 usd'
     """
-    chars = list(text)
+    if not any(ch in _SEGMENTER_SET for ch in text):
+        return text
+
     out: list[str] = []
+    chars = text
+    last_index = len(chars) - 1
     for i, ch in enumerate(chars):
         if ch in _SEGMENTERS:
             prev_digit = i > 0 and chars[i - 1].isdigit()
-            next_digit = i + 1 < len(chars) and chars[i + 1].isdigit()
+            next_digit = i < last_index and chars[i + 1].isdigit()
             # keep an in-number thousands separator (e.g. "2,000")
             if ch == "," and prev_digit and next_digit:
                 out.append(ch)

@@ -14,15 +14,17 @@ ECTOR itself has no web dependencies; FastAPI/uvicorn live in the optional
 
 from __future__ import annotations
 
+import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ector import __version__, extract_sync
-from ector.languages import supported_languages
+from ector.languages import get_language, supported_languages
+from ector.models import get_model
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
@@ -31,12 +33,39 @@ REPO_URL = "https://github.com/Sanix-Darker/ector"
 
 # Reject absurdly large payloads to keep the demo responsive.
 MAX_TEXT_CHARS = 5000
+_SUPPORTED_LANGS = frozenset(supported_languages())
+_MODEL_READY: dict[str, bool] = {code: False for code in _SUPPORTED_LANGS}
+_logger = logging.getLogger(__name__)
+
 
 app = FastAPI(
     title="ECTOR",
     description="Fast, deterministic e-commerce request parser (NL -> structured query).",
     version=__version__,
 )
+
+
+def _normalize_lang(raw_lang: str | None) -> str:
+    """Normalize incoming language code from public requests."""
+    return str(raw_lang or "").strip().lower()
+
+
+def _resolve_lang(raw_lang: str | None) -> str:
+    """Resolve user-supplied language to supported defaults."""
+    candidate = _normalize_lang(raw_lang)
+    return candidate if candidate in _SUPPORTED_LANGS else "en"
+
+
+@app.on_event("startup")
+def _warm_models() -> None:
+    for code in _SUPPORTED_LANGS:
+        try:
+            get_model(get_language(code).model_name)
+        except OSError as exc:
+            _logger.warning("Model warmup failed for %s: %s", code, exc)
+            _MODEL_READY[code] = False
+        else:
+            _MODEL_READY[code] = True
 
 
 class ExtractRequest(BaseModel):
@@ -130,7 +159,9 @@ def health() -> dict:
     return {
         "status": "ok",
         "version": __version__,
-        "languages": list(supported_languages()),
+        "languages": list(_SUPPORTED_LANGS),
+        "model_ready": dict(_MODEL_READY),
+        "models_loaded": all(_MODEL_READY.values()),
         "repo": REPO_URL,
         "max_chars": MAX_TEXT_CHARS,
     }
@@ -143,9 +174,12 @@ def examples() -> dict:
 
 @app.post("/api/extract")
 def extract_endpoint(req: ExtractRequest) -> JSONResponse:
-    lang = req.lang if req.lang in supported_languages() else "en"
+    lang = _resolve_lang(req.lang)
     text = (req.text or "")[:MAX_TEXT_CHARS]
-    result = extract_sync(text, lang)
+    try:
+        result = extract_sync(text, lang)
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return JSONResponse(result)
 
 
@@ -156,12 +190,9 @@ def tokenize_endpoint(req: TokenizeRequest) -> dict:
     Words = whitespace-ish split; tokens = spaCy tokenization (the units ECTOR
     actually reasons over). Cheap: only the tokenizer is exercised.
     """
-    from ector.languages import get_language
-    from ector.models import get_model
-
     text = req.text or ""
     words = len(text.split())
-    lang = req.lang if req.lang in supported_languages() else "en"
+    lang = _resolve_lang(req.lang)
     nlp = get_model(get_language(lang).model_name)
     # tokenizer.pipe is the cheapest path; count non-space tokens.
     doc = nlp.tokenizer(text[:MAX_TEXT_CHARS])
