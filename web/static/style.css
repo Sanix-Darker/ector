@@ -428,3 +428,27 @@ button.primary:hover { opacity: .92; }
 .counter { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .counter .num { color: var(--fg); font-weight: 600; }
 .hint { color: var(--muted); font-size: 12px; }
+
+/* Mobile / tablet: wrap long code snippets inside ``code-block`` and the
+   topbar ``install`` row so they stay readable and the Copy button on
+   .code-head remains in reach without needing to pan a horizontally-
+   scrolling pre. The breakpoint matches ``.docs-grid`` collapsing to a
+   single column, so the rule covers tablet widths where ``.code-block``
+   is already full-width and prone to overflow. Desktop behavior keeps
+   ``overflow-x: auto`` for wide pasted commands. */
+@media (max-width: 1100px) {
+  .code-block pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    overflow-x: hidden;
+  }
+  .install {
+    flex-wrap: wrap;
+  }
+  .install code {
+    overflow-wrap: anywhere;
+    word-break: break-all;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}
