@@ -136,6 +136,111 @@ body {
 .chip:hover { border-color: var(--border-strong); background: var(--card); }
 .chip:active { transform: translateY(1px); }
 
+/* API + Docker section */
+.docs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+}
+.docs-head h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.docs-head .tagline {
+  margin: 0;
+  max-width: none;
+}
+.docs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 1100px) {
+  .docs-grid { grid-template-columns: 1fr; }
+}
+
+.doc-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg);
+}
+.doc-card-head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.doc-card h3 {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: .04em;
+}
+.doc-card .muted {
+  margin: 0;
+}
+.doc-rows {
+  display: grid;
+  gap: 6px;
+}
+.doc-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px;
+  align-items: baseline;
+}
+.doc-row strong {
+  font-size: 12px;
+  color: var(--fg);
+}
+.doc-row code {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--fg);
+}
+
+.code-block {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0b1022;
+  overflow: hidden;
+}
+[data-theme="light"] .code-block {
+  background: #0b1022;
+}
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  color: #d6d6f7;
+  font-size: 12px;
+}
+.code-block pre {
+  margin: 0;
+  padding: 10px;
+  overflow-x: auto;
+}
+.code-block code {
+  color: #e2e8f0;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
 /* Panes */
 .panes {
   display: grid;

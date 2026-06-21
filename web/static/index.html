@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ECTOR — e-commerce request parser</title>
+  <title>ECTOR — deterministic parser (GitHub, GitLab, Azure-ready)</title>
   <link rel="stylesheet" href="/static/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
 </head>
@@ -46,6 +46,83 @@
         </div>
       </div>
       <div id="examples"></div>
+    </section>
+
+    <section class="docs-section">
+      <div class="docs-head">
+        <h2>API & Docker usage</h2>
+        <span class="tagline">Use the public JSON API from any client, or run ECTOR from GitHub Container Registry.</span>
+      </div>
+
+      <div class="docs-grid">
+        <article class="doc-card">
+          <div class="doc-card-head">
+            <h3>Public API</h3>
+          </div>
+          <div class="doc-rows">
+            <div class="doc-row">
+              <strong>GET</strong> <code>/api/health</code>
+              <span class="muted">Service status + supported languages.</span>
+            </div>
+            <div class="doc-row">
+              <strong>GET</strong> <code>/api/examples</code>
+              <span class="muted">Curated EN/FR samples.</span>
+            </div>
+            <div class="doc-row">
+              <strong>POST</strong> <code>/api/extract</code>
+              <span class="muted">Returns parsed shopping request JSON.</span>
+            </div>
+            <div class="doc-row">
+              <strong>POST</strong> <code>/api/tokenize</code>
+              <span class="muted">Counts words and spaCy tokens.</span>
+            </div>
+          </div>
+
+          <div class="code-block">
+            <div class="code-head">
+              <span>Example request</span>
+              <button class="copy-btn" type="button" data-copy-code>Copy</button>
+            </div>
+            <pre><code>curl -X POST https://ector.sanixdk.xyz/api/extract \
+  -H "Content-Type: application/json" \
+  -d '{"text":"I want two refurbished laptops, budget 700 usd","lang":"en"}'</code></pre>
+          </div>
+        </article>
+
+        <article class="doc-card">
+          <div class="doc-card-head">
+            <h3>Run with Docker</h3>
+          </div>
+          <p class="muted">Image is published on GitHub Container Registry for fast deployment.</p>
+
+          <div class="code-block">
+            <div class="code-head">
+              <span>Pull image</span>
+              <button class="copy-btn" type="button" data-copy-code>Copy</button>
+            </div>
+            <pre><code>docker pull ghcr.io/sanix-darker/ector:latest</code></pre>
+          </div>
+
+          <div class="code-block">
+            <div class="code-head">
+              <span>Run container</span>
+              <button class="copy-btn" type="button" data-copy-code>Copy</button>
+            </div>
+            <pre><code>docker run --rm -d --name ector-web \
+  -p 8000:8000 ghcr.io/sanix-darker/ector:latest</code></pre>
+          </div>
+
+          <div class="code-block">
+            <div class="code-head">
+              <span>Compose (recommended)</span>
+              <button class="copy-btn" type="button" data-copy-code>Copy</button>
+            </div>
+            <pre><code>cd deploy
+docker compose pull
+docker compose up -d</code></pre>
+          </div>
+        </article>
+      </div>
     </section>
 
     <main class="panes">

@@ -54,6 +54,16 @@ uvicorn web.app:app --reload
 - The endpoint is unauthenticated and intended for local/demo use. If you deploy
   it publicly, put it behind auth / rate limiting and restrict CORS as needed.
 
+The container image can also be used directly:
+
+```bash
+docker pull ghcr.io/sanix-darker/ector:latest
+docker run --rm -d --name ector-web -p 8000:8000 ghcr.io/sanix-darker/ector:latest
+curl -X POST http://127.0.0.1:8000/api/extract \
+  -H "Content-Type: application/json" \
+  -d '{"text":"I want two refurbished laptops, budget 700 usd","lang":"en"}'
+```
+
 ## Deployment
 
 Production deployment files (Caddy reverse proxy, hardened systemd unit, env

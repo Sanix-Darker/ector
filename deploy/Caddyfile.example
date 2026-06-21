@@ -16,6 +16,8 @@ https://example.com {
 	# automatically (set your email with the global `email` option).
 	tls internal
 
+	# In Docker Compose mode this should point to the service name:
+	# reverse_proxy ector-web:8000
 	reverse_proxy 127.0.0.1:8000
 	encode gzip
 

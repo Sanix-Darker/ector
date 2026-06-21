@@ -323,6 +323,14 @@
     });
   }
 
+  function initCodeCopyButtons() {
+    document.querySelectorAll("[data-copy-code]").forEach((btn) => {
+      const code = btn.closest(".code-block")?.querySelector("code");
+      if (!code) return;
+      btn.addEventListener("click", (e) => copyText(code.innerText.trim(), e.target));
+    });
+  }
+
   // ---------------------------------------------------------------- examples
   function byLang() {
     const groups = {};
@@ -426,6 +434,7 @@
 
   initTheme();
   updateCounts();
+  initCodeCopyButtons();
   loadExamples();
   loadHealth();
 })();

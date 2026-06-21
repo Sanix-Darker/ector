@@ -58,18 +58,35 @@ it with Caddy and add rate limiting if exposed publicly.
 
 ```bash
 cp deploy/Caddyfile.example deploy/Caddyfile
-# In deploy/Caddyfile, change the reverse_proxy target from
-#   reverse_proxy 127.0.0.1:8000
-# to the compose service name:
-#   reverse_proxy ector-web:8000
+# For Docker compose mode, Caddy must proxy to `ector-web:8000`.
+# (In the copied Caddyfile this can be done by replacing `127.0.0.1:8000`.)
 $EDITOR deploy/Caddyfile   # set your domain
 
 cd deploy
-docker compose up --build -d
+docker compose up -d
 ```
 
-The app image (`deploy/Dockerfile`) installs `ector[web]` and both spaCy models
-so the container is self-contained and offline at runtime.
+## Option C — GHCR image deployment (recommended)
+
+```bash
+docker pull ghcr.io/sanix-darker/ector:latest
+cd deploy
+docker compose up -d
+```
+
+The app image (`deploy/Dockerfile`) installs `ector[web,models]` and is self-contained/offline at runtime.
+
+For local source builds (useful for validating changes), use:
+
+```bash
+cd deploy
+ECTOR_IMAGE=ector-web:dev \
+  docker compose -f docker-compose.yml -f docker-compose.local.yml up --build -d
+```
+
+The CI workflow `.github/workflows/docker.yml` publishes:
+`ghcr.io/sanix-darker/ector:latest` and `ghcr.io/sanix-darker/ector:<sha>`
+on every push to `master`.
 
 ---
 

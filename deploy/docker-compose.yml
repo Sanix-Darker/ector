@@ -1,12 +1,12 @@
 # ECTOR web + Caddy reverse proxy (modeled on the caddy-fastapi pattern).
 # Usage:
-#   cd deploy && docker compose up --build
-# Then point your domain at the host; edit Caddyfile.example -> Caddyfile first.
+#   cd deploy && docker compose up -d
+# Pulls ghcr.io/sanix-darker/ector:latest by default.
+# For local image build:
+#   ECTOR_IMAGE=ector-web:dev docker compose -f docker-compose.yml -f docker-compose.local.yml up --build -d
 services:
   ector-web:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
+    image: ${ECTOR_IMAGE:-ghcr.io/sanix-darker/ector:latest}
     environment:
       HOST: "0.0.0.0"
       PORT: "8000"
