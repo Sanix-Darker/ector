@@ -20,8 +20,7 @@ RUN pip install --upgrade pip \
     && pip install --no-cache-dir ".[web,models]"
 
 # Run as non-root for a safer container runtime.
-RUN groupadd --system --gid 10001 ector \
-    && useradd --system --uid 10001 --gid 10001 --home /home/ector --create-home ector \
+RUN useradd --create-home --uid 10001 --comment "" ector \
     && chown -R ector:ector /app
 USER ector
 
@@ -31,5 +30,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:' + __import__('os').environ.get('PORT','8000') + '/api/health').read(); sys.exit(0)"
 
-# Shell form so HOST/PORT/WORKERS expand from the environment.
-CMD uvicorn web.app:app --host ${HOST} --port ${PORT} --workers ${WORKERS}
+# Keep runtime env expansion for host/port/workers while preserving signal handling.
+CMD ["sh", "-c", "uvicorn web.app:app --host ${HOST} --port ${PORT} --workers ${WORKERS}"]
