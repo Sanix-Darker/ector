@@ -34,6 +34,16 @@ COMMON_WORDS_EN: frozenset[str] = frozenset({
     "warm", "cold", "soft", "hard", "light", "heavy",
     "sell", "sells", "selling", "sends", "tell", "tells", "dell",  # keep as-is if typed; do not let other words collapse onto brands
     "does", "done", "doing", "yes", "okay",
+    # Common English words that would otherwise fuzzy-collide onto currency
+    # tokens at distance 1 (via the FuzzyIndex cross-letter scan). Listing
+    # them here in the protective stop-list prevents ``normalize_vocabulary``
+    # from rewriting real text like ``found`` -> ``pound`` and ``quit`` ->
+    # ``quid``. ``sticks`` is intentionally excluded because it is a real
+    # product noun (drumsticks, chopsticks) and the typist likely means it.
+    "found", "bound", "round", "sound", "mound", "wound", "hound",
+    "frank", "prank", "drank", "blank", "clank",
+    "books", "ducks", "rocks", "locks", "socks", "mocks",
+    "quiet", "quieted", "quit", "quits",
 })
 
 COMMON_WORDS_FR: frozenset[str] = frozenset({
