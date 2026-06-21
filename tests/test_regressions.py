@@ -113,6 +113,63 @@ class TestRegressions(unittest.TestCase):
         result = extract_sync("I want to buy for 50 usd.")
         self.assertEqual(result["products"], [])
 
+    # Precision: a 2-edit currency typo must not become its own product entry.
+    # "eors" is at Damerau-Levenshtein distance 2 from "euros" (delete 'u' AND
+    # shift). Falls past the default fuzzy threshold; explicit misspellings
+    # entries (added to CURRENCY_MISSPELLINGS) keep precision tight.
+    def test_two_edit_currency_typo_not_product(self):
+        cases = [
+            "I want a nespresso for 15 eors",
+            "looking for a lacoste around 20 bucjsk",
+            "i want a phone for 100 euors",
+        ]
+        for text in cases:
+            result = extract_sync(text)
+            products = result.get("products", [])
+            # No phantom currency-as-product entry.
+            for p in products:
+                self.assertNotEqual(
+                    p.get("product", "").lower().strip(),
+                    "eors",
+                    f"eors leaked as product for {text!r}",
+                )
+                self.assertNotEqual(
+                    p.get("product", "").lower().strip(),
+                    "bucjsk",
+                    f"bucjsk leaked as product for {text!r}",
+                )
+                self.assertNotEqual(
+                    p.get("product", "").lower().strip(),
+                    "euors",
+                    f"euors leaked as product for {text!r}",
+                )
+
+    # Common English words must NEVER be silently rewritten to currency tokens
+    # by ``normalize_vocabulary``. ``COMMON_WORDS_EN`` is the protective stop-list;
+    # this test pins that the extend-list covers the words that would otherwise
+    # fuzzy-collide onto currency at distance 1.
+    def test_common_words_not_rewritten_to_currency(self):
+        from ector.normalize import normalize_vocabulary
+        # Each entry is paired with the currency word it would otherwise
+        # collapse onto, so the test catches both halves of the safety
+        # property (preserve token, do not introduce currency).
+        pairs = (
+            ("found", "pound"), ("round", "pound"), ("hank", "pound"),
+            ("frank", "franc"), ("prank", "franc"), ("drank", "franc"),
+            ("books", "bucks"), ("ducks", "bucks"), ("rocks", "bucks"),
+            ("quiet", "quid"), ("quit", "quid"),
+        )
+        for word, bad_rewrite in pairs:
+            out = normalize_vocabulary(f"I want a {word}.", "en")
+            self.assertIn(
+                word, out.lower(),
+                f"{word!r} was rewritten: {out!r}",
+            )
+            self.assertNotIn(
+                bad_rewrite, out.lower(),
+                f"{word!r} incorrectly rewritten to {bad_rewrite!r}: {out!r}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
