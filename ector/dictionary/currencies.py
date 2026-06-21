@@ -126,6 +126,16 @@ CURRENCY_MISSPELLINGS: dict[str, str] = {
     "dirhm": "dirham",
     "dirhem": "dirham",
     "riyel": "riyal",
+    # Two-edit misspellings discovered on adversarial input (precision fix).
+    # Each entry is at Damerau-Levenshtein distance 2 from its canonical
+    # counterpart, which is past the default fuzzy threshold; explicit
+    # entries are safer than bumping tolerance (which over-matches normal
+    # English words like "found"->"pound", "ducks"->"bucks").
+    "eors": "euros",
+    "euors": "euros",
+    "bucjsk": "bucks",
+    "dollrr": "dollars",
+    "pundse": "pounds",
 }
 
 # Words that are recognised as the currency-bearing terms (for fuzzy matching).
