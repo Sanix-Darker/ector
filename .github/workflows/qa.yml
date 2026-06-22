@@ -1,0 +1,339 @@
+name: QA Matrix
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+  # Manual rerun for maintainers: re-run the full or single-surface suite
+  # against any ref without spinning up Playwright or uvicorn on the wrong
+  # coverage area. ``role`` filters ``scripts/_qa_common.ROLES`` via
+  # ``resolve_active_roles``; ``ref`` overrides ``actions/checkout``'s ref
+  # so you can poke a branch or SHA without triggering a CI push.
+  workflow_dispatch:
+    inputs:
+      role:
+        description: >-
+          Which QA surface to run. "all" runs the full matrix; "script"
+          runs only script+cli+http (no Playwright, requires uvicorn);
+          "browser" runs only Playwright/Chromium stories (browser runner
+          starts its own uvicorn if the port is free).
+        type: choice
+        options:
+          - all
+          - script
+          - browser
+        default: all
+        required: true
+      ref:
+        description: >-
+          Git ref to checkout (branch / tag / SHA). Defaults to the
+          current ref when the workflow is dispatched by hand. Leave
+          blank to keep the dispatch target's native ref.
+        type: string
+        required: false
+        default: ""
+
+# No concurrency cancels: every push generates a fresh matrix snapshot in
+# `docs/FEATURE_MATRIX.csv`, so re-running is cheap and harmless.
+concurrency:
+  group: qa-matrix-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  qa:
+    name: QA Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      QA_BASE: http://127.0.0.1:8765
+      IS_PR: ${{ github.event_name == 'pull_request' }}
+      EVENT_NAME: ${{ github.event_name }}
+      INPUT_ROLE: ${{ inputs.role }}
+      INPUT_REF: ${{ inputs.ref }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # ``inputs.ref`` is non-empty only on workflow_dispatch; the
+          # ``|| github.ref`` fallback covers push/PR events.
+          ref: ${{ inputs.ref || github.ref }}
+          # fetch-depth 0 so PR baseline diff can read origin/main.
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: poetry
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Install web + test extras
+        run: poetry run pip install "fastapi>=0.110" "uvicorn>=0.29" httpx
+
+      - name: Download spaCy language models
+        run: |
+          poetry run python -m spacy download en_core_web_sm
+          poetry run python -m spacy download fr_core_news_sm
+
+      - name: Install Playwright + Chromium (browser surface only)
+        # Skipped on push events (browser role is runs_on_push=False) and
+        # on workflow_dispatch with role=script; only installed when the
+        # active set includes the browser role.
+        if: ${{ fromJSON(steps.compute.outputs.flags).needs_browser == true }}
+        run: |
+          poetry run pip install playwright
+          poetry run playwright install chromium
+          poetry run playwright install-deps chromium || true
+
+      - name: Snapshot baseline matrix (PR diff only)
+        # Status-flip detection vs. ``origin/main`` is meaningful for PRs.
+        # On push / manual reruns we either have no off-branch baseline or
+        # we don't want spurious diffs against an unrelated ref.
+        if: github.event_name == 'pull_request'
+        run: |
+          if git rev-parse --verify origin/main >/dev/null 2>&1; then
+            git show origin/main:docs/FEATURE_MATRIX.csv > /tmp/baseline.csv || \
+              cp docs/FEATURE_MATRIX.csv /tmp/baseline.csv
+          else
+            cp docs/FEATURE_MATRIX.csv /tmp/baseline.csv
+          fi
+          wc -l /tmp/baseline.csv
+
+      - name: Compute roles + manifest for this event
+        # Single source of truth: scripts/_qa_common.ROLES. The active
+        # set is filtered by resolve_active_roles(is_pr, INPUT_ROLE,
+        # is_dispatch) which:
+        #  - on push/PR: ignores INPUT_ROLE and applies runs_on_push
+        #  - on workflow_dispatch with role=all: returns every Role, even
+        #    the ones normally skipped on push, so maintainers can rerun
+        #    the full matrix against a chosen ref via the Actions UI
+        #  - on workflow_dispatch with role=script|browser: forces that
+        #    surface regardless of runs_on_push
+        id: compute
+        run: |
+          # All five JSON files share the same active-set derivation so
+          # downstream steps can't drift. The heredoc is ``<<'PY'`` so
+          # bash never expands ``$VAR`` — Python reads IS_PR / EVENT_NAME
+          # / INPUT_ROLE / INPUT_REF directly from the inherited job env.
+          ACTIVE_JSON=$(poetry run python <<'PY'
+          import os, json, sys
+          sys.path.insert(0, 'scripts')
+          from _qa_common import resolve_active_roles, friendly_name
+          is_pr = os.environ.get('IS_PR', 'false') == 'true'
+          fr = os.environ.get('INPUT_ROLE', '') or 'all'
+          is_dispatch = os.environ.get('EVENT_NAME', '') == 'workflow_dispatch'
+          # ``or '·'`` falls back to a placeholder when INPUT_REF is the
+          # empty string (truthy-or-default); the bare default to
+          # os.environ.get only fires when the key is absent.
+          ref = os.environ.get('INPUT_REF', '') or '·'
+          active = resolve_active_roles(is_pr=is_pr, filter_role=fr, is_dispatch=is_dispatch)
+          out = {
+              "active": [r.summary_stem for r in active],
+              "manifest": {r.summary_stem: True for r in active},
+              "roles": [r._asdict() for r in active],
+              "flags": {
+                  "needs_browser": any(r.summary_stem == "qa-browser-summary" for r in active),
+                  # script rows with Verify_Method=http need an external
+                  # uvicorn because scripts/run_user_stories.py doesn't
+                  # start its own server. browser rows don't strictly
+                  # need it (browser_user_stories.py boots its own if
+                  # port 8765 is free), but exposing the script
+                  # requirement is enough — browser-only runs skip
+                  # uvicorn to honor the user's "don't spin up the
+                  # wrong surface" intent.
+                  "needs_uvicorn": any(r.summary_stem == "qa-script-summary" for r in active),
+                  "is_manual": os.environ.get('EVENT_NAME', '') == 'workflow_dispatch',
+                  "filter_role": fr,
+                  "filter_label": "all" if fr in ("", "all") else friendly_name("qa-" + fr + "-summary"),
+                  "ref": ref,
+              },
+              "subtitle": (
+                  f"manual re-run (role={fr or 'all'}){(f' \u00b7 ref={ref}') if ref != '\u00b7' else ''}"
+                  if os.environ.get('EVENT_NAME', '') == 'workflow_dispatch'
+                  else ""
+              ),
+          }
+          print(json.dumps(out))
+          PY
+          )
+          # Split the single ACTIVE_JSON into each individual file so the
+          # downstream consumers (matrix step, qa_gate --expected, flags
+          # step output) see the same shape they saw before this refactor.
+          echo "$ACTIVE_JSON" | poetry run python -c "import sys, json; print(json.dumps(json.load(sys.stdin)['roles']))" > /tmp/roles.json
+          echo "$ACTIVE_JSON" | poetry run python -c "import sys, json; print(json.dumps(json.load(sys.stdin)['manifest']))" > /tmp/qa-expected.json
+          echo "$ACTIVE_JSON" | poetry run python -c "import sys, json; print(json.dumps(json.load(sys.stdin)['active']))" > /tmp/stems.json
+          echo "$ACTIVE_JSON" | poetry run python -c "import sys, json; print(json.dumps(json.load(sys.stdin)['flags']))" > /tmp/flags.json
+          echo "$ACTIVE_JSON" | poetry run python -c "import sys, json; print(json.load(sys.stdin).get('subtitle',''))" > /tmp/subtitle.txt
+          echo "::group::ROLES computed"
+          echo "EVENT_NAME=$EVENT_NAME  IS_PR=$IS_PR  INPUT_ROLE=$INPUT_ROLE  INPUT_REF=$INPUT_REF"
+          cat /tmp/stems.json
+          echo
+          cat /tmp/qa-expected.json
+          echo
+          cat /tmp/flags.json
+          echo
+          echo "subtitle: $(cat /tmp/subtitle.txt)"
+          echo "::endgroup::"
+          # Multi-line $GITHUB_OUTPUT (heredoc syntax). Unique terminators
+          # avoid the documented "EOF\\n in JSON closes early" footgun.
+          {
+            echo "roles<<EOF_ROLES_OUT"; cat /tmp/roles.json; echo "EOF_ROLES_OUT"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "stems<<EOF_STEMS_OUT"; cat /tmp/stems.json; echo "EOF_STEMS_OUT"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "flags<<EOF_FLAGS_OUT"; cat /tmp/flags.json; echo "EOF_FLAGS_OUT"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "subtitle<<EOF_SUBTITLE_OUT"; cat /tmp/subtitle.txt; echo "EOF_SUBTITLE_OUT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate canonical CSV
+        run: poetry run python scripts/_seed_matrix.py
+
+      - name: Start uvicorn for HTTP stories
+        # Only when the active set includes a runner that depends on
+        # external uvicorn. Manual ``role=browser`` runs SKIP this step.
+        if: ${{ fromJSON(steps.compute.outputs.flags).needs_uvicorn == true }}
+        run: |
+          nohup poetry run uvicorn web.app:app \
+            --host 127.0.0.1 --port 8765 --log-level warning \
+            > /tmp/uvicorn.log 2>&1 &
+          UVI_PID=$!
+          echo "uvicorn pid=$UVI_PID"
+          for i in $(seq 1 90); do
+            if curl -sf http://127.0.0.1:8765/api/health > /dev/null 2>&1; then
+              # Wait until models_loaded=true so http_extract_ok actually works.
+              if curl -s http://127.0.0.1:8765/api/health | grep -q '"models_loaded": true'; then
+                echo "uvicorn ready with models"
+                break
+              fi
+            fi
+            sleep 1
+          done
+          # Always log final state for debugging.
+          curl -s http://127.0.0.1:8765/api/health || true
+
+      - name: Run QA role (matrix over stems from scripts/_qa_common.ROLES)
+        # Adding a runner = one line in ROLES; this step expands over every
+        # active stem from steps.compute.outputs.stems. Serialized via
+        # max-parallel: 1 because every runner writes the same
+        # docs/FEATURE_MATRIX.csv (--update).
+        id: run-role
+        strategy:
+          matrix:
+            stem: ${{ fromJSON(steps.compute.outputs.stems) }}
+          fail-fast: false
+          max-parallel: 1
+        env:
+          ROLE_STEM: ${{ matrix.stem }}
+        # Don't early-exit on failure: we still want to build the summary
+        # and post the PR comment so reviewers see the failures.
+        continue-on-error: true
+        run: poetry run python scripts/qa_runner.py "$ROLE_STEM"
+
+      - name: Tear down uvicorn
+        if: always()
+        run: |
+          pkill -f 'uvicorn web.app:app' || true
+
+      - name: Build QA markdown summary
+        if: always()
+        run: |
+          set +e
+          # The active set + subtitle are precomputed by the compute
+          # step (single source of truth via scripts/_qa_common.ROLES).
+          # Render each runner's status HONESTLY: emit "missing" when the
+          # JSON doesn't exist, the actual exit_code otherwise. A crashed
+          # runner must not look like a passing one in the markdown.
+          ACTIVE_STEMS=$(python -c "import json; print(' '.join(json.load(open('/tmp/stems.json'))))")
+          SUBTITLE=$(cat /tmp/subtitle.txt 2>/dev/null || true)
+          echo "::group::Active stems: $ACTIVE_STEMS"
+          [ -n "$SUBTITLE" ] && echo "subtitle: $SUBTITLE"
+          echo "::endgroup::"
+          RUNNER_ARGS=""
+          for STEM in $ACTIVE_STEMS; do
+            if [ -f "./$STEM.json" ]; then
+              RC=$(python -c "import json;print(json.load(open('./$STEM.json')).get('exit_code', 0))")
+            else
+              RC="missing"
+            fi
+            RUNNER_ARGS="$RUNNER_ARGS --runner $STEM=$RC"
+          done
+          # Only pass present summary paths to qa_summary.py (it would
+          # crash on a missing file; the gate step handles those).
+          SUMMARIES=""
+          for STEM in $ACTIVE_STEMS; do
+            [ -f "./$STEM.json" ] && SUMMARIES="$SUMMARIES ./$STEM.json"
+          done
+          poetry run python scripts/qa_summary.py $SUMMARIES \
+            --baseline-csv /tmp/baseline.csv \
+            $RUNNER_ARGS > ./qa-output.md
+          if [ -n "$SUBTITLE" ]; then
+            TMP=$(mktemp)
+            { echo "## $SUBTITLE"; cat ./qa-output.md; } > "$TMP" && mv "$TMP" ./qa-output.md
+          fi
+          echo "=== qa-output.md ==="
+          cat ./qa-output.md
+
+      - name: Emit step summary
+        if: always()
+        run: cat ./qa-output.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update sticky PR comment (PR only)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('./qa-output.md', 'utf8');
+            const marker = '<!-- qa-matrix -->';
+            const full = body.includes(marker) ? body : (marker + '\n' + body);
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find(c => (c.body || '').includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: full,
+              });
+              core.info('Updated existing QA-matrix comment id=' + existing.id);
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: full,
+              });
+              core.info('Created new QA-matrix comment');
+            }
+
+      - name: "Gate: exit 1 if any unacked [!]"
+        if: always()
+        # qa_gate.py auto-discovers every ROLES stem in the repo root
+        # (--summary-dir .) and uses the manifest from --expected to decide
+        # which were required. A runner that wasn't scheduled is fine; one
+        # that crashed mid-run (file missing but stem in ROLES) is a gate
+        # failure. Manual reruns honour the same fail-closed behaviour.
+        run: python scripts/qa_gate.py --expected /tmp/qa-expected.json
