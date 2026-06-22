@@ -41,6 +41,14 @@ _BUY = (
     "je voudrais", "j'aimerais",
 )
 
+# Substring phrases that explicitly mark the request as browse even when
+# products are mentioned (without these, "looking at watches" falls into the
+# has_products -> "buy" fallback at the bottom of classify_intent).
+_BROWSE_OVERRIDE = (
+    "looking at", "just looking", "browsing",
+    "juste regarder", "juste pour regarder",
+)
+
 
 def _has_any(text: str, phrases: tuple[str, ...]) -> bool:
     return any(p in text for p in phrases)
@@ -61,4 +69,14 @@ def classify_intent(text: str, has_products: bool) -> str:
         return "compare"
     if _has_any(low, _BUY):
         return "buy"
+    # Word-boundary override: only short single-word keys like "browsing" can
+    # substring-collide (e.g. "I'm browsing the catalogue to find a deal"); the
+    # two-word phrases ("looking at", "just looking", ...) are specific enough
+    # to use plain substring.
+    if any(re.search(rf"\b{re.escape(p)}\b", low) for p in _BROWSE_OVERRIDE
+           if " " not in p):
+        return "browse"
+    for p in _BROWSE_OVERRIDE:
+        if " " in p and p in low:
+            return "browse"
     return "buy" if has_products else "browse"

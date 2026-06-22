@@ -299,13 +299,18 @@ def collect_product_phrase(
     words: list[Token] = [product_token]
 
     def _keep_modifier(child: Token) -> bool:
-        # Exclude numbers, currency tokens, and condition/constraint/elision
-        # words so they never bloat the product name ("Televiseur 400",
-        # "Ordinateur portable occasion euros").
+        # Drop raw numbers so they never bloat the product name ("Televiseur 400").
         if child.like_num:
             return False
-        if is_currency_only(child.lower_):
+        # US-003 / RISK-009: a currency word whose subtree also carries a
+        # numeric amount is a price fragment ("usd" in "200 usd") and must
+        # be dropped; a currency word with NO numeric in its subtree is a
+        # descriptive compound-noun modifier ("pound" in "pound cake") and
+        # is KEPT.
+        if is_currency_only(child.lower_) and any(n.like_num for n in child.subtree):
             return False
+        # Drop condition/constraint/elision surface forms ("Ordinateur portable
+        # occasion euros", "minimum" / "max").
         if child.lower_ in _PHRASE_STOP_MODIFIERS:
             return False
         return True

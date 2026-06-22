@@ -79,6 +79,38 @@ class TestProducts(unittest.TestCase):
         phrase = collect_product_phrase(tokens[0], tokens)
         self.assertIn("cake", phrase.lower())
 
+    def test_pound_cake_keeps_currency_word_as_modifier(self):
+        # Context-aware _keep_modifier: "pound" is a currency word but appears
+        # with no numeric in its subtree, so it must be kept as the descriptive
+        # compound-noun modifier of "cake" => "Pound cake" (not "Cake").
+        sent = self._sent("I want a pound cake.")
+        tokens = find_main_product_tokens(sent, self.en)
+        phrase = collect_product_phrase(tokens[0], tokens)
+        self.assertEqual(phrase.lower(), "pound cake")
+
+    def test_currency_word_with_numeric_still_dropped(self):
+        # "pound" whose subtree carries the numeric "200" must STILL be
+        # dropped from the product phrase. This is the regression guard
+        # for the context-aware fix: a currency word with numeric in its
+        # subtree is treated as a price fragment, not a compound modifier.
+        sent = self._sent("I want a 200-pound dumbbell.")
+        tokens = find_main_product_tokens(sent, self.en)
+        self.assertEqual([t.text for t in tokens], ["dumbbell"])
+        phrase = collect_product_phrase(tokens[0], tokens)
+        self.assertNotIn("pound", phrase.lower())
+        self.assertEqual(phrase.lower(), "dumbbell")
+
+    def test_currency_word_in_compound_phrase_kept(self):
+        # "pound" with NO numeric in its subtree stays as a compound
+        # noun modifier of "cake" => "pound cake". Mirrors US-003 at
+        # the collect_product_phrase layer. Use a transitive verb so
+        # "cake" lands as the direct object (nsubj-only inputs make
+        # find_main_product_tokens return []).
+        sent = self._sent("She's baking a pound cake for the party.")
+        tokens = find_main_product_tokens(sent, self.en)
+        phrase = collect_product_phrase(tokens[0], tokens)
+        self.assertEqual(phrase.lower(), "pound cake")
+
 
 if __name__ == "__main__":
     unittest.main()
