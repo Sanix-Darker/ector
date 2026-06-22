@@ -1,0 +1,12 @@
+# ECTOR QA — known-failures allowlist.
+#
+# Append a row ID (one per line) to this file to ACK a known failing user story.
+# Acknowledged rows are still flagged `[!]` in `docs/FEATURE_MATRIX.csv`
+# (preserving the audit trail of "this used to pass") but are excluded from
+# the workflow exit code in `.github/workflows/qa.yml`.
+#
+# Use sparingly: every entry should reference a tracking issue or be paired
+# with a TODO to remove the entry once the underlying case is fixed.
+#
+# Example:
+#   US-003   # tracked in https://github.com/jeveu/ector/issues/123

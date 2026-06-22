@@ -1,0 +1,89 @@
+ID,Component,Story,Input,Expected,Verify_Method,Status,Notes
+US-001,extraction,"Extract ""I want a new laptop."" -> 1 product ""New laptop""",I want a new laptop.,"{""products"":[{""product"":""New laptop""}]}",script,[✓],PASS
+US-002,extraction,"Extract ""I want 2 phones."" -> quantity=2 product ""Phones""",I want 2 phones.,"{""products"":[{""product"":""Phone"",""quantity"":2}]}",script,[✓],PASS
+US-003,extraction,"Extract ""I want a pound cake."" -> product ""Pound cake"" survives currency-word-in-name",I want a pound cake.,"{""products"":[{""product"":""Pound cake""}]}",script,[✓],PASS
+US-004,extraction,Multi-product with comma split + budget,"I want a mouse and a keyboard, my budget is 150 usd","{""products"":[{""product"":""Mouse""},{""product"":""Keyboard""}],""budget"":{""price"":150,""currency"":""usd""}}",script,[✓],PASS
+US-005,extraction,Reverse order: product then budget inferred later,My budget is 150 usd. Looking for a mouse and a keyboard,"{""products"":[{""product"":""Mouse""},{""product"":""Keyboard""}],""budget"":{""price"":150,""currency"":""usd""}}",script,[✓],PASS
+US-010,extraction,Budget emitted even without currency (BUG-008 fix),My budget is 300.,"{""budget"":{""price"":300}}",script,[✓],PASS
+US-011,extraction,French budget hint je n'ai que 50 euros (BUG-001 fix),[fr] je n'ai que 50 euros.,"{""budget"":{""price"":50,""currency"":""eur""}}",script,[✓],PASS
+US-012,extraction,Budget with US dollars expressed in different currency,My budget is 200 dollars.,"{""budget"":{""price"":200,""currency"":""usd""}}",script,[✓],PASS
+US-013,extraction,"Budget says ""only"" -> detected as budget context",I only have 300 usd.,"{""budget"":{""price"":300,""currency"":""usd""}}",script,[✓],PASS
+US-020,extraction,"parse_price(""$1,000"") -> 1000 USD (thousands separator)","$1,000",price_eq:1000.0:usd,script,[✓],PASS
+US-021,extraction,"parse_price(""9,99 eur"") decimal comma -> 9.99","9,99 eur",price_eq:9.99:eur,script,[✓],PASS
+US-022,extraction,"parse_price(""25$"") -> 25 USD (symbol-after)",25$,price_eq:25.0:usd,script,[✓],PASS
+US-023,extraction,"parse_price(""€25"") -> 25 EUR (symbol-before)",€25,price_eq:25.0:eur,script,[✓],PASS
+US-024,extraction,"parse_price(""25usd"") -> 25 USD (glued)",25usd,price_eq:25.0:usd,script,[✓],PASS
+US-025,extraction,"parse_price(""2.5k usd"") -> 2500 USD (shorthand-k)",2.5k usd,price_eq:2500.0:usd,script,[✓],PASS
+US-026,extraction,"parse_price(""twenty dollars"") -> 20 USD (spelled-out)",twenty dollars,price_eq:20.0:usd,script,[✓],PASS
+US-027,extraction,Bare number is NOT a price by default,I want 2 phones.,price_eqnone,script,[✓],dparse_price=None
+US-028,extraction,Bare number IS a price when allow_bare,my budget is 300,price_bare_eq:300.0:,script,[✓],currency=None expected None
+US-030,extraction,French multi-product with typos - budget at minimum,[fr] je veu un ordinateu portable et une sourris budjet 800 euros,"{""budget"":{""price"":800,""currency"":""eur""}}",script,[✓],PASS
+US-040,extraction,"Unknown language code ""xx"" falls back to en without error",I want a laptop,quiet_unknown,script,[✓],PASS
+US-050,api,extract_sync returns a dict with 'products' key,I want a laptop,has_products_key,script,[✓],PASS
+US-051,api,extract returns a coroutine consumable via asyncio.run,I want a laptop,async_works,script,[✓],PASS
+US-052,api,"Empty input """" -> empty products",,empty_products,script,[✓],products=[]
+US-053,api,Whitespace input -> empty products,   ,empty_products,script,[✓],products=[]
+US-054,api,ector.__version__ is a non-empty string,,version_string,script,[✓],version='0.1.2'
+US-055,api,extract_sync cache returns equal results on repeat calls,i want a laptop,cached_call_works,script,[✓],a==b is True
+US-070,typo,"normalize_vocabulary(""lookng"") -> ""looking""",lookng,normalize_eq:looking,script,[✓],got 'looking' expected 'looking'
+US-071,typo,"normalize_vocabulary(""labtop"") -> ""laptop""",labtop,normalize_eq:laptop,script,[✓],got 'laptop' expected 'laptop'
+US-072,typo,"normalize_vocabulary(""budjet"") -> ""budget""",budjet,normalize_eq:budget,script,[✓],got 'budget' expected 'budget'
+US-073,typo,"Common word ""frank"" NOT rewritten to ""franc""",frank,normalize_eq:frank,script,[✓],got 'frank' expected 'frank'
+US-074,typo,Real shopper typo parses to products + budget,i wnat an ipone and a chargr budjet 200 euoros,typo_has_iphone,script,[✓],products='iphone charger'
+US-075,typo,2-edit currency typo 'eors' must not become its own product,,not_product:I want a nespresso for 15 eors:eors,script,[✓],product names=['nespresso']
+US-080,fields,"Brand ""nike"" is detected within product phrase",red nike shoes,brand_eq:nike,script,[✓],PASS
+US-081,fields,"Color ""red"" detected as attribute",red nike shoes,attrs_contains:red,script,[✓],PASS
+US-082,fields,"Condition ""refurbished"" detected",refurbished macbook,condition_eq:refurbished,script,[✓],PASS
+US-083,fields,"Quantity ""2 phones"" -> quantity=2",I want 2 phones.,quantity_eq:2,script,[✓],PASS
+US-084,fields,"Constraint max from ""under 200 usd""",I want a laptop under 200 usd,constraint_type:max|constraint_value:200|constraint_currency:usd,script,[✓],PASS
+US-085,fields,"Constraint min from ""over 50 usd""",I want shoes over 50 usd,constraint_type:min|constraint_value:50,script,[✓],PASS
+US-086,fields,"Constraint around from ""around 100 usd""",I want a monitor around 100 usd,constraint_type:around|constraint_value:100,script,[✓],PASS
+US-087,fields,"Constraint between from ""between 100 and 200 usd""",I want a phone between 100 and 200 usd,constraint_type:between|constraint_min:100|constraint_max:200,script,[✓],PASS
+US-088,fields,"Constraint FR max from ""moins de 200""",[fr] je cherche un velo moins de 200 euros,constraint_type:max|constraint_value:200|constraint_currency:eur,script,[✓],PASS
+US-089,fields,"Intent ""buy"" for ""I want a laptop""",I want a laptop,intent_eq:buy,script,[✓],PASS
+US-090,fields,"Intent ""price_check"" for ""how much is the iphone""",how much is the iphone,intent_eq:price_check,script,[✓],PASS
+US-091,fields,"Intent ""availability"" for ""do you have a sofa in stock""",do you have a sofa in stock,intent_eq:availability,script,[✓],PASS
+US-092,fields,"Intent ""browse"" for generic looking without buy signal",looking at watches,intent_eq:browse,script,[✓],PASS
+US-060,cli,"python -m ector ""I want a laptop"" prints valid JSON to stdout",I want a laptop,cli_json_valid,cli,[✓],"rc=0 keys=['products', 'intent']"
+US-061,cli,"python -m ector --lang fr ""je veux un velo"" exits 0",je veux un velo,cli_fr_works,cli,[✓],"obj keys=['products', 'intent']"
+US-062,cli,python -m ector --compact emits compact single-line JSON,I want a laptop,cli_compact,cli,[✓],"stdout had newline: 't"":""Laptop""}],""intent"":""buy""}\n'"
+US-063,cli,python -m ector with no input -> non-zero exit + clear stderr,,cli_no_input_fails,cli,[✓],"rc=2 stderr='usage: ector [-h] [--lang {en,fr}] [--file FILE] [--pretty | --compact]\n             [--version]\n             [text]\nect'"
+US-064,cli,python -m ector --help shows usage text,,cli_help_shows,cli,[✓],"rc=0 stdout_head='usage: ector [-h] [--lang {en,fr}] [--file FILE] [--pretty | --compact]\n        '"
+US-065,cli,python -m ector --version prints version,,cli_version_shows,cli,[✓],rc=0 out='ector 0.1.2'
+US-100,web,"GET /api/health -> status 200 + JSON {""status"":""ok""}",GET /api/health,http_health_ok,http,[!],"FAIL: FAIL: request failed: URLError(ConnectionRefusedError(111, 'Connection refused'))"
+US-101,web,"POST /api/extract valid payload -> 200 + JSON with ""products""","POST /api/extract:{""text"":""I want a laptop"",""lang"":""en""}",http_extract_ok,http,[!],"FAIL: FAIL: request failed: URLError(ConnectionRefusedError(111, 'Connection refused'))"
+US-102,web,GET /api/examples -> 200 + non-empty examples array,GET /api/examples,http_examples_ok,http,[!],"FAIL: FAIL: request failed: URLError(ConnectionRefusedError(111, 'Connection refused'))"
+US-103,web,POST /api/tokenize -> 200 + has words|tokens|chars,"POST /api/tokenize:{""text"":""Hello world"",""lang"":""en""}",http_tokenize_ok,http,[!],"FAIL: FAIL: request failed: URLError(ConnectionRefusedError(111, 'Connection refused'))"
+US-104,web,"GET / serves index.html with ""ECTOR"" in body",GET /,http_index_ok,http,[!],"FAIL: FAIL: request failed: URLError(ConnectionRefusedError(111, 'Connection refused'))"
+US-105,web,GET /static/style.css -> 200,GET /static/style.css,http_static_css_ok,http,[!],"FAIL: FAIL: request failed: URLError(ConnectionRefusedError(111, 'Connection refused'))"
+US-106,web,GET /static/app.js -> 200,GET /static/app.js,http_static_js_ok,http,[!],"FAIL: FAIL: request failed: URLError(ConnectionRefusedError(111, 'Connection refused'))"
+US-107,web,POST /api/extract with text >5000 chars is truncated to 5000,POST /api/extract:big_text,http_truncate_ok,http,[!],"FAIL: EXC: URLError(ConnectionRefusedError(111, 'Connection refused'))"
+US-W100,web,"EN chip ""Multi-product + budget"" populates textarea + JSON tree renders >=2 rows",chip:Multi-product + budget,textarea_contains:wireless gaming mouse|jrow_min:2,browser,[ ],unknown method 'browser'
+US-W101,web,"EN chip ""Typos everywhere"" populates textarea + JSON tree renders",chip:Typos everywhere,textarea_contains:wnat|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W102,web,"EN chip ""Refurbished + price cap"" populates textarea + JSON tree renders",chip:Refurbished + price cap,textarea_contains:macbook|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W103,web,"EN chip ""Between range"" populates textarea + JSON tree renders",chip:Between range,textarea_contains:monitor|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W104,web,"EN chip ""Price check"" populates textarea (price_check may yield no products)",chip:Price check,textarea_contains:nike air|jrow_min:0,browser,[ ],unknown method 'browser'
+US-W105,web,"EN chip ""Quantity + total"" populates textarea + JSON tree >=2 rows",chip:Quantity + total,textarea_contains:wireless chargers|jrow_min:2,browser,[ ],unknown method 'browser'
+US-W106,web,"EN chip ""Availability"" populates textarea + JSON tree renders",chip:Availability,textarea_contains:sofa|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W107,web,"EN chip ""Used, min price"" populates textarea + JSON tree renders","chip:Used, min price",textarea_contains:iphone|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W108,web,"EN chip ""Shorthand price"" populates textarea + JSON tree renders",chip:Shorthand price,textarea_contains:laptop|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W109,web,"EN chip ""Slang currency"" populates textarea + JSON tree renders",chip:Slang currency,textarea_contains:jordans|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W110,web,"FR chip ""Budget + produits"" populates textarea + JSON tree >=2 rows",chip:Budget + produits,textarea_contains:velo|jrow_min:2,browser,[ ],unknown method 'browser'
+US-W111,web,"FR chip ""Contrainte de prix"" populates textarea + JSON tree renders",chip:Contrainte de prix,textarea_contains:ordinateur portable|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W112,web,"FR chip ""Fautes de frappe"" populates textarea + JSON tree >=2 rows",chip:Fautes de frappe,textarea_contains:je veu|jrow_min:2,browser,[ ],unknown method 'browser'
+US-W113,web,"FR chip ""Multi-produits"" populates textarea + JSON tree >=3 rows",chip:Multi-produits,textarea_contains:frigo|jrow_min:3,browser,[ ],unknown method 'browser'
+US-W114,web,"FR chip ""Marque + couleur"" populates textarea + JSON tree >=2 rows",chip:Marque + couleur,textarea_contains:iphone|jrow_min:2,browser,[ ],unknown method 'browser'
+US-W115,web,"FR chip ""Disponibilité"" populates textarea + JSON tree renders",chip:Disponibilité,textarea_contains:montre|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W116,web,"FR chip ""Fourchette de prix"" populates textarea + JSON tree renders",chip:Fourchette de prix,textarea_contains:televiseur|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W117,web,"FR chip ""Quantité"" populates textarea + JSON tree >=2 rows",chip:Quantité,textarea_contains:claviers|jrow_min:2,browser,[ ],unknown method 'browser'
+US-W118,web,"FR chip ""Prix demandé"" populates textarea + JSON tree renders",chip:Prix demandé,textarea_contains:samsung|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W119,web,"FR chip ""Reconditionné"" populates textarea + JSON tree renders",chip:Reconditionné,textarea_contains:macbook reconditionne|jrow_min:1,browser,[ ],unknown method 'browser'
+US-W120,web,"FR chip ""Budget seul"" populates textarea (budget-only, not a giant tree)",chip:Budget seul,textarea_contains:budget|jrow_max:30,browser,[ ],unknown method 'browser'
+US-W121,web,"FR chip ""Mélange complexe"" populates textarea + JSON tree >=3 rows",chip:Mélange complexe,textarea_contains:canape|jrow_min:3,browser,[ ],unknown method 'browser'
+US-W122,web,Theme toggle flips data-theme to dark,click:#theme-toggle,theme:dark,browser,[ ],unknown method 'browser'
+US-W123,web,Theme toggle back to light,click:#theme-toggle,theme:light|continue:true,browser,[ ],unknown method 'browser'
+US-W124,web,"Click ""Copy"" on install snippet writes the install command to clipboard",click:#copy-install,clipboard:pip install ector,browser,[ ],unknown method 'browser'
+US-W125,web,Click Copy on first code-block puts a curl command into clipboard,click:.code-block .copy-btn,clipboard_contains:curl -X POST,browser,[ ],unknown method 'browser'
+US-W126,web,"Click ""Combine samples"" joins two same-lang examples into the textarea",click:#combine,textarea_contains:. |textarea_len_min:60,browser,[ ],unknown method 'browser'
+US-W127,web,"Click ""Random pick"" fills textarea non-empty",click:#random,textarea_len_min:10,browser,[ ],unknown method 'browser'
+US-W128,web,Select language to fr updates the #lang dropdown value,select_lang:fr,lang_value:fr,browser,[ ],unknown method 'browser'
