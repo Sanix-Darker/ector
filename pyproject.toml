@@ -22,7 +22,7 @@ models = [
 # Optional web showcase (FastAPI demo). Core library has no web dependencies.
 #   pip install "ector[web]"
 web = [
-    "fastapi>=0.110",
+    "fastapi>=0.138.1",
     "uvicorn>=0.29",
 ]
 
